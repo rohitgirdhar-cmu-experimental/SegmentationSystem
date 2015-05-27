@@ -1,0 +1,1 @@
+temp-dir/img.jpg 1
