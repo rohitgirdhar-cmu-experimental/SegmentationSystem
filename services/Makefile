@@ -15,6 +15,12 @@ else
 	CPPFLAGS += -DCPU_ONLY
 endif
 
+# for the zmq
+INC += -I/home/rgirdhar/data/Software/cpp/zeromq/install/include/
+INC += -I/home/rgirdhar/data/Software/cpp/zeromq/cppzmq/
+LIBS += -L/home/rgirdhar/data/Software/cpp/zeromq/install/lib/
+LDFLAGS += -lzmq
+
 all: $(patsubst %.cpp, %.bin, $(wildcard *.cpp))
 
 %.bin: %.cpp Makefile

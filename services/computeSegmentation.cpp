@@ -1,5 +1,5 @@
 /**
- * Code to compute CNN (ImageNet) features for a given image using CAFFE
+ * Code to compute CNN (Xiaolong's segmentation network) features for a given image using CAFFE
  * (c) Rohit Girdhar
  */
 
@@ -11,6 +11,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp> // for to_lower
 #include "caffe/caffe.hpp"
+#include <zmq.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -71,58 +72,49 @@ main(int argc, char *argv[]) {
   Net<float> seg_caffe_test_net(SEG_NETWORK_PATH.string());
   seg_caffe_test_net.CopyTrainedLayersFrom(SEG_MODEL_PATH.string());
 
+  void *context = zmq_ctx_new();
+  void *responder = zmq_socket(context, ZMQ_REP);
+  int rc = zmq_bind(responder, "tcp://*:5556");
+  assert(rc == 0);
 
-  system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_10_1349841918000_4_2.jpg temp-dir/img.jpg");
-  vector<Blob<float>*> dummy_blob_input_vec;
-  loc_caffe_test_net.Forward(dummy_blob_input_vec);
-  boost::shared_ptr<Blob<float> > bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
-  ofstream of("temp-dir/locResult.txt");
-  of << "temp-dir/img.jpg ";
-  for (int i = 0; i < 4; i++) {
-    of << bboxs->data_at(0, i, 0, 0) << " ";
-  }
-  of << endl;
-  of.close();
+  LOG(INFO) << "Server Ready";
 
-  {
-  seg_caffe_test_net.Forward(dummy_blob_input_vec);
-  boost::shared_ptr<Blob<float> > output = seg_caffe_test_net.blob_by_name("fc8_seg");
-  Mat seg(DIM, DIM, CV_32FC1);
-  for (int i = 0; i < DIM; i++) {
-    for (int j = 0; j < DIM; j++) {
-      seg.at<float>(i, j) = (float) output->data_at(0, i * DIM + j, 0, 0);
+  while (true) {
+    char buffer[1000], outbuf[1000];
+    zmq_recv(responder, buffer, 1000, 0);
+    system((string("ln -s ") + buffer + " temp-dir/img.jpg").c_str());
+    //system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_17_1350452326000_7_0.jpg temp-dir/img.jpg");
+    vector<Blob<float>*> dummy_blob_input_vec;
+    loc_caffe_test_net.Forward(dummy_blob_input_vec);
+    boost::shared_ptr<Blob<float> > bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
+    vector<float> save_box;
+    ofstream of("temp-dir/locResult.txt");
+    of << "temp-dir/img.jpg ";
+    for (int i = 0; i < 4; i++) {
+      of << bboxs->data_at(0, i, 0, 0) << " ";
+      save_box.push_back(bboxs->data_at(0, i, 0, 0));
     }
-  }
-  Mat seg2;
-  seg.convertTo(seg2, CV_8UC1);
-  equalizeHist(seg2, seg2);
-  imwrite("temp.jpg", seg2);
-  }
- 
-  system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_10_1349841918000_4_0.jpg temp-dir/img.jpg");
-  loc_caffe_test_net.Forward(dummy_blob_input_vec);
-  bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
-  ofstream of2("temp-dir/locResult.txt");
-  of2 << "temp-dir/img.jpg ";
-  for (int i = 0; i < 4; i++) {
-    of2 << bboxs->data_at(0, i, 0, 0) << " ";
-  }
-  of2 << endl;
-  of2.close();
-  
-  {
-  seg_caffe_test_net.Forward(dummy_blob_input_vec);
-  boost::shared_ptr<Blob<float> > output = seg_caffe_test_net.blob_by_name("fc8_seg");
-  Mat seg(DIM, DIM, CV_32FC1);
-  for (int i = 0; i < DIM; i++) {
-    for (int j = 0; j < DIM; j++) {
-      seg.at<float>(i, j) = (float) output->data_at(0, i * DIM + j, 0, 0);
+    of << endl;
+    of.close();
+
+    seg_caffe_test_net.Forward(dummy_blob_input_vec);
+    boost::shared_ptr<Blob<float> > output = seg_caffe_test_net.blob_by_name("fc8_seg");
+    Mat seg(DIM, DIM, CV_32FC1);
+    for (int i = 0; i < DIM; i++) {
+      for (int j = 0; j < DIM; j++) {
+        seg.at<float>(i, j) = (float) output->data_at(0, i * DIM + j, 0, 0);
+      }
     }
-  }
-  Mat seg2;
-  seg.convertTo(seg2, CV_8UC1);
-  equalizeHist(seg2, seg2);
-  imwrite("temp.jpg", seg2);
+    Mat seg2 = seg;
+    genSegImg(save_box[0], save_box[1], save_box[2], save_box[3],
+        seg, seg2, 256, 256);
+    Mat seg3;
+    seg2.convertTo(seg3, CV_8UC1);
+    equalizeHist(seg3, seg3);
+    imwrite("temp-dir/result.jpg", seg3);
+
+    system("unlink temp-dir/img.jpg");
+    zmq_send(responder, "done", 4, 0);
   }
 
   return 0;
@@ -130,8 +122,13 @@ main(int argc, char *argv[]) {
 
 void genSegImg(float xmin, float ymin, float xmax, float ymax, const Mat& S, Mat& res,
     int NW_IMG_HT, int NW_IMG_WID) {
+  float OFFSET = (256 - 227) / 2.0;
   res = Mat(NW_IMG_HT, NW_IMG_WID, CV_32FC1);
   res.setTo(0);
+  xmin = std::min(std::max(xmin + OFFSET, (float) 0), (float) NW_IMG_WID-1);
+  ymin = std::min(std::max(ymin + OFFSET, (float) 0), (float) NW_IMG_HT-1);
+  xmax = std::min(std::max(xmax + OFFSET, (float) 0), (float) NW_IMG_WID-1);
+  ymax = std::min(std::max(ymax + OFFSET, (float) 0), (float) NW_IMG_HT-1);
   int x1 = xmin;
   int y1 = ymin;
   int x2 = xmax;
