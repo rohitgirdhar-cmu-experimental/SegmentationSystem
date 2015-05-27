@@ -70,11 +70,12 @@ main(int argc, char *argv[]) {
   loc_caffe_test_net.CopyTrainedLayersFrom(LOC_MODEL_PATH.string());
   Net<float> seg_caffe_test_net(SEG_NETWORK_PATH.string());
   seg_caffe_test_net.CopyTrainedLayersFrom(SEG_MODEL_PATH.string());
- 
+
+
+  system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_10_1349841918000_4_2.jpg temp-dir/img.jpg");
   vector<Blob<float>*> dummy_blob_input_vec;
   loc_caffe_test_net.Forward(dummy_blob_input_vec);
   boost::shared_ptr<Blob<float> > bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
-  vector<float> loc_output;
   ofstream of("temp-dir/locResult.txt");
   of << "temp-dir/img.jpg ";
   for (int i = 0; i < 4; i++) {
@@ -83,6 +84,7 @@ main(int argc, char *argv[]) {
   of << endl;
   of.close();
 
+  {
   seg_caffe_test_net.Forward(dummy_blob_input_vec);
   boost::shared_ptr<Blob<float> > output = seg_caffe_test_net.blob_by_name("fc8_seg");
   Mat seg(DIM, DIM, CV_32FC1);
@@ -95,7 +97,34 @@ main(int argc, char *argv[]) {
   seg.convertTo(seg2, CV_8UC1);
   equalizeHist(seg2, seg2);
   imwrite("temp.jpg", seg2);
+  }
  
+  system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_10_1349841918000_4_0.jpg temp-dir/img.jpg");
+  loc_caffe_test_net.Forward(dummy_blob_input_vec);
+  bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
+  ofstream of2("temp-dir/locResult.txt");
+  of2 << "temp-dir/img.jpg ";
+  for (int i = 0; i < 4; i++) {
+    of2 << bboxs->data_at(0, i, 0, 0) << " ";
+  }
+  of2 << endl;
+  of2.close();
+  
+  {
+  seg_caffe_test_net.Forward(dummy_blob_input_vec);
+  boost::shared_ptr<Blob<float> > output = seg_caffe_test_net.blob_by_name("fc8_seg");
+  Mat seg(DIM, DIM, CV_32FC1);
+  for (int i = 0; i < DIM; i++) {
+    for (int j = 0; j < DIM; j++) {
+      seg.at<float>(i, j) = (float) output->data_at(0, i * DIM + j, 0, 0);
+    }
+  }
+  Mat seg2;
+  seg.convertTo(seg2, CV_8UC1);
+  equalizeHist(seg2, seg2);
+  imwrite("temp.jpg", seg2);
+  }
+
   return 0;
 }
 
