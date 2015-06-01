@@ -82,8 +82,11 @@ main(int argc, char *argv[]) {
   while (true) {
     char buffer[1000], outbuf[1000];
     zmq_recv(responder, buffer, 1000, 0);
-    system((string("ln -s ") + buffer + " temp-dir/img.jpg").c_str());
-    //system("cp /home/rgirdhar/memexdata/Dataset/processed/0001_Backpage/Images/corpus/ImagesTexas/Texas_2012_10_17_1350452326000_7_0.jpg temp-dir/img.jpg");
+    
+    system("unlink temp-dir/img.jpg");
+    string cmd = string("ln -s ") + buffer + " temp-dir/img.jpg";
+    LOG(INFO) << "Running cmd : " << cmd;
+    system(cmd.c_str());
     vector<Blob<float>*> dummy_blob_input_vec;
     loc_caffe_test_net.Forward(dummy_blob_input_vec);
     boost::shared_ptr<Blob<float> > bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
@@ -102,7 +105,7 @@ main(int argc, char *argv[]) {
     Mat seg(DIM, DIM, CV_32FC1);
     for (int i = 0; i < DIM; i++) {
       for (int j = 0; j < DIM; j++) {
-        seg.at<float>(i, j) = (float) output->data_at(0, i * DIM + j, 0, 0);
+        seg.at<float>(Point2d(j, i)) = (float) output->data_at(0, i * DIM + j, 0, 0);
       }
     }
     Mat seg2 = seg;
@@ -113,8 +116,8 @@ main(int argc, char *argv[]) {
     equalizeHist(seg3, seg3);
     imwrite("temp-dir/result.jpg", seg3);
 
-    system("unlink temp-dir/img.jpg");
-    zmq_send(responder, "done", 4, 0);
+    //system("unlink temp-dir/img.jpg");
+    zmq_send(responder, "done", 5, 0);
   }
 
   return 0;
