@@ -49,7 +49,7 @@ class a_POST_handler:
         socket = context.socket(zmq.REQ)
         socket.connect("tcp://localhost:5556")
         # strings must be null-delimited (C style)
-        socket.send(down_image_loc)
+        socket.send(down_image_loc + "\0")
         socket.recv()
         result_fpath = '/srv2/rgirdhar/Work/Code/0005_ObjSegment/scripts/service_scripts/temp-dir/result.jpg'
         while not os.path.exists(result_fpath) and num_tries > 10:
