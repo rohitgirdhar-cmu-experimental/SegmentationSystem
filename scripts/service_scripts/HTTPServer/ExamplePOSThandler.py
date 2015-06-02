@@ -43,7 +43,7 @@ class a_POST_handler:
   def genSegmentation(self, text):
         down_image_loc = '/tmp/segtemp/qimg.jpg'
         # download and save the image
-        down_cmd = 'wget ' + text + ' --output-document="' + down_image_loc + '"'
+        down_cmd = 'wget --no-check-certificate ' + text + ' --output-document="' + down_image_loc + '"'
         subprocess.call(down_cmd, shell=True)
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
