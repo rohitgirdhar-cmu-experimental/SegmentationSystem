@@ -81,7 +81,8 @@ main(int argc, char *argv[]) {
 
   while (true) {
     char buffer[1000], outbuf[1000];
-    zmq_recv(responder, buffer, 1000, 0);
+    int len = zmq_recv(responder, buffer, 1000, 0);
+    buffer[len] = '\0';
     
     system("unlink temp-dir/img.jpg");
     string cmd = string("ln -s ") + buffer + " temp-dir/img.jpg";
