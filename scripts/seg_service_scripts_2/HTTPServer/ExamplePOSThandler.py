@@ -26,6 +26,8 @@ class a_POST_handler:
 
           # retrieve the result from zmq and return
           resp = self.genSegmentation(text)
+          if len(resp) == 0:
+            request_handler.send_error(553, "Internal error in segmentation")
           # convert to JSON
           resp = self.convertToJSON(resp)
 
@@ -46,7 +48,8 @@ class a_POST_handler:
         text = text.strip()
         print '>' + text + '<'
         down_cmd = 'wget --no-check-certificate ' + text + ' --output-document="' + down_image_loc + '"'
-        subprocess.call(down_cmd, shell=True)
+        if subprocess.call(down_cmd, shell=True) != 0:
+          return ''
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect("tcp://localhost:5559")
