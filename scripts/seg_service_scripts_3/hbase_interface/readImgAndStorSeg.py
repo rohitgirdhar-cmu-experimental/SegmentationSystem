@@ -45,6 +45,8 @@ for key,data in tab.scan():
   f = open(temp_img_path, 'wb')
   f.write(raw_img)
   f.close()
+  if len(raw_img) == 0:
+    continue
   # run segmentation
   socket.send(os.path.realpath(temp_img_path) + '\0')
   socket.recv()
@@ -57,11 +59,13 @@ for key,data in tab.scan():
   #writing it out
   out_tab.put(key, {'seg:orig' : seg_output, 
       'loc:xmin' : loc_output[0],
-      'loc:xmax' : loc_output[1],
-      'loc:ymin' : loc_output[2],
+      'loc:ymin' : loc_output[1],
+      'loc:xmax' : loc_output[2],
       'loc:ymax' : loc_output[3]})
 
   end_time = time.time()
   time_elap = end_time - start_time
-  tic_toc_print('Elapsed %f sec\n' % time_elap)
+  total_time_elap += time_elap
+  nitem += 1
+  tic_toc_print('Done till %d. Elapsed %f sec\n Avg time %f sec\n' % (nitem, time_elap, total_time_elap / nitem))
 
