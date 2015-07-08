@@ -7,12 +7,13 @@ import os
 
 #### CONFIG
 hbase_url = '10.1.94.57'
-hbase_table = 'roxyscrape'
+hbase_table = 'image_cache'
 temp_img_path = './temp-dir/img.jpg'
 seg_service_port = 5561
 output_hbase_table = 'rgirdhar-CMU-segmentation'
 seg_fpath = '../temp-dir/result.jpg'
 loc_fpath = '../temp-dir/locResult.txt'
+bin_image_key_name = 'image:binary'
 ###########
 
 last_print_time = -1
@@ -26,7 +27,6 @@ def refineBox(bbox):
   OFFSET = (256 -227) / 2
   return [str(float(el) + OFFSET) for el in bbox]
 
-
 # set up hbase
 conn = hb.Connection(hbase_url)
 tab = conn.table(hbase_table)
@@ -38,10 +38,13 @@ socket.connect('tcp://localhost:%d' % seg_service_port)
 
 total_time_elap = 0
 nitem = 0
-for key,data in tab.scan():
+for key,data in tab.scan(batch_size=400):
   start_time = time.time()
   # get image
-  raw_img = base64.b64decode(data['image:orig'])
+  #raw_img = base64.b64decode(data['image:orig'])
+  if bin_image_key_name not in data:
+    continue
+  raw_img = data[bin_image_key_name]
   f = open(temp_img_path, 'wb')
   f.write(raw_img)
   f.close()
@@ -67,5 +70,5 @@ for key,data in tab.scan():
   time_elap = end_time - start_time
   total_time_elap += time_elap
   nitem += 1
-  tic_toc_print('Done till %d. Elapsed %f sec\n Avg time %f sec\n' % (nitem, time_elap, total_time_elap / nitem))
+  tic_toc_print('Done till %d (key=%s). Elapsed %f sec\n Avg time %f sec\n' % (nitem, key, time_elap, total_time_elap / nitem))
 
