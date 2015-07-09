@@ -14,6 +14,7 @@ output_hbase_table = 'rgirdhar-CMU-segmentation'
 seg_fpath = '../temp-dir/result.jpg'
 loc_fpath = '../temp-dir/locResult.txt'
 bin_image_key_name = 'image:binary'
+START_ID = '00103C5B9425A40D806D2D1D7D0D2AF8CEF4D303'
 ###########
 
 last_print_time = -1
@@ -38,7 +39,7 @@ socket.connect('tcp://localhost:%d' % seg_service_port)
 
 total_time_elap = 0
 nitem = 0
-for key,data in tab.scan(batch_size=400):
+for key,data in tab.scan(START_ID, batch_size=300):
   start_time = time.time()
   # get image
   #raw_img = base64.b64decode(data['image:orig'])
