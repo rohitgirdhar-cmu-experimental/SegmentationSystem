@@ -44,6 +44,11 @@ main(int argc, char *argv[]) {
      "Path to the segmentation prototxt file")
     ("seg-model-path,q", po::value<string>()->required(),
      "Path to segmentation caffemodel")
+    ("port-num", po::value<string>()->default_value("5556"),
+     "Port to run this service on")
+    ("temp-dir", po::value<string>()->default_value("temp-dir"),
+     "Path to the directory where the images list and the results will be written out. "
+     "Make sure each service uses a separate directory or else might mix up results")
     ;
 
   po::variables_map vm;
@@ -59,12 +64,13 @@ main(int argc, char *argv[]) {
     return -1;
   }
 
-  fs::path LOC_NETWORK_PATH = fs::path(vm["loc-network-path"].as<string>());
-  fs::path LOC_MODEL_PATH = 
+  const fs::path LOC_NETWORK_PATH = fs::path(vm["loc-network-path"].as<string>());
+  const fs::path LOC_MODEL_PATH = 
     fs::path(vm["loc-model-path"].as<string>());
-  fs::path SEG_NETWORK_PATH = fs::path(vm["seg-network-path"].as<string>());
-  fs::path SEG_MODEL_PATH = 
+  const fs::path SEG_NETWORK_PATH = fs::path(vm["seg-network-path"].as<string>());
+  const fs::path SEG_MODEL_PATH = 
     fs::path(vm["seg-model-path"].as<string>());
+  const string temp_dir_path = vm["temp-dir"].as<string>();
 
   Caffe::set_phase(Caffe::TEST);
   Net<float> loc_caffe_test_net(LOC_NETWORK_PATH.string());
@@ -74,7 +80,7 @@ main(int argc, char *argv[]) {
 
   void *context = zmq_ctx_new();
   void *responder = zmq_socket(context, ZMQ_REP);
-  int rc = zmq_bind(responder, "tcp://*:5556");
+  int rc = zmq_bind(responder, ("tcp://*:" + vm["port-num"].as<string>()).c_str());
   assert(rc == 0);
 
   LOG(INFO) << "Server Ready";
@@ -84,16 +90,16 @@ main(int argc, char *argv[]) {
     int len = zmq_recv(responder, buffer, 1000, 0);
     buffer[len] = '\0';
     
-    system("unlink temp-dir/img.jpg");
-    string cmd = string("ln -s ") + buffer + " temp-dir/img.jpg";
+    system(("unlink " + temp_dir_path + "/img.jpg").c_str());
+    string cmd = string("ln -s ") + buffer + " " + temp_dir_path + "/img.jpg";
     LOG(INFO) << "Running cmd : " << cmd;
     system(cmd.c_str());
     vector<Blob<float>*> dummy_blob_input_vec;
     loc_caffe_test_net.Forward(dummy_blob_input_vec);
     boost::shared_ptr<Blob<float> > bboxs = loc_caffe_test_net.blob_by_name("fc8_loc");
     vector<float> save_box;
-    ofstream of("temp-dir/locResult.txt");
-    of << "temp-dir/img.jpg ";
+    ofstream of((temp_dir_path + "/locResult.txt").c_str());
+    of << temp_dir_path + "/img.jpg ";
     for (int i = 0; i < 4; i++) {
       of << bboxs->data_at(0, i, 0, 0) << " ";
       save_box.push_back(bboxs->data_at(0, i, 0, 0));
@@ -115,7 +121,7 @@ main(int argc, char *argv[]) {
     Mat seg3;
     seg2.convertTo(seg3, CV_8UC1);
     equalizeHist(seg3, seg3);
-    imwrite("temp-dir/result.jpg", seg3);
+    imwrite((temp_dir_path + "/result.jpg").c_str(), seg3);
 
     //system("unlink temp-dir/img.jpg");
     zmq_send(responder, "done", 5, 0);
