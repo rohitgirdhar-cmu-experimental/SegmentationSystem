@@ -1,0 +1,3 @@
+[submodule "nips14_loc_seg_testonly"]
+	path = nips14_loc_seg_testonly
+	url = git@github.com:rohitgirdhar/nips14_loc_seg_testonly.git
