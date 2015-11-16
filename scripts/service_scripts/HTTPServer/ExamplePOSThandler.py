@@ -42,6 +42,8 @@ class a_POST_handler:
   
   def genSegmentation(self, text):
         down_image_loc = '/tmp/segtemp/qimg.jpg'
+        if not os.path.exists(os.path.dirname(down_image_loc)):
+          os.makedirs(os.path.dirname(down_image_loc))
         # download and save the image
         down_cmd = 'wget --no-check-certificate ' + text + ' --output-document="' + down_image_loc + '"'
         subprocess.call(down_cmd, shell=True)
